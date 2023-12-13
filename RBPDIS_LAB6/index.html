@@ -1,0 +1,258 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Список поездовй</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.0/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body>
+    <h2>Список поездов</h2>
+    <form name="trainForm">
+        <input type="hidden" name="trainId" value="0" />
+        <div class="form-group col-md-5">
+            <label for="trainNumber">Номер поезда:</label>
+            <input class="form-control" name="trainNumber" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="distanceInKm">Дистанция пути, км.:</label>
+            <input class="form-control" name="distanceInKm" type="text" pattern="[0-9]+(\.[0-9]+)?" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="isBrandedTrain">Брэндированый?:</label>
+            <input class="form-control" name="isBrandedTrain" type="checkbox" />
+        </div>
+        <div class="form-group col-md-5">
+            <label for="trainType">Тип поезда:</label>
+            <select class="form-control" name="trainType">
+            </select>
+        </div>
+        <div class="panel-body">
+            <button type="submit" id="submit" class="btn btn-primary">Сохранить</button>
+            <a id="reset" class="btn btn-primary">Сбросить</a>
+        </div>
+    </form>
+    <hr>
+    <table class="table table-dark table-striped">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Номер</th>
+                <th>Дистанция пути, км.</th>
+                <th>Брэндированый?</th>
+                <th>Тип поезда</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <script>
+        let allTrainTypes = [];
+        // Получение и сохранение всех типов поездов в опции
+        async function fillTrainTypes() {
+            const response = await fetch("http://localhost:5001/api/TrainTypes");
+            if (response.ok === true) {
+                allTrainTypes = await response.json();
+                const selectElement = document.querySelector("select[name='trainType']");
+
+                allTrainTypes.forEach(trainType => {
+                    const optionElement = document.createElement("option");
+                    optionElement.value = trainType.trainTypeId;
+                    optionElement.textContent = trainType.typeName;
+                    selectElement.appendChild(optionElement);
+                });
+            }
+        }
+
+        // Получение всех поездов в таблицу
+        async function GetTrains() {
+            // отправляет запрос и получаем ответ
+            const response = await fetch("http://localhost:5001/api/trains", {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            // если запрос прошел нормально
+            if (response.ok === true) {
+                // получаем данные
+                const trains = await response.json();
+                let rows = document.querySelector("tbody");
+                trains.forEach(train => {
+                    // добавляем полученные элементы в таблицу
+                    rows.append(row(train));
+                });
+            }
+        }
+        function refreshTable() {
+            // Очищаем tbody таблицы
+            const tableBody = document.querySelector("table tbody");
+            tableBody.innerHTML = "";
+
+            // Вызываем функцию GetTrains() для получения обновленных данных
+            GetTrains();
+        }
+        // Получение одного поезда
+        async function GetTrain(trainId) {
+            const response = await fetch("http://localhost:5001/api/trains/" + trainId, {
+                method: "GET",
+                headers: { "Accept": "application/json" }
+            });
+            if (response.ok === true) {
+                const train = await response.json();
+                const form = document.forms["trainForm"];
+                form.elements["trainId"].value = train.trainId;
+                form.elements["trainNumber"].value = train.trainNumber;
+                form.elements["distanceInKm"].value = train.distanceInKm;
+                form.elements["isBrandedTrain"].checked = train.isBrandedTrain;
+                form.elements["trainType"].value = train.trainTypeId;
+            }
+        }
+
+        async function CreateTrain(trainNumber, distanceInKm, isBrandedTrain, trainTypeId) {
+            const response = await fetch("http://localhost:5001/api/trains", {
+                method: "POST",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    trainNumber: trainNumber,
+                    distanceInKm: distanceInKm,
+                    isBrandedTrain: isBrandedTrain,
+                    trainTypeId: trainTypeId
+                })
+            });
+            if (response.ok === true) {
+                const train = await response.json();
+                reset();
+                tableBody.appendChild(row(train));
+            }
+        }
+
+        async function EditTrain(trainId, trainNumber, distanceInKm, isBrandedTrain, trainTypeId) {
+            const response = await fetch("http://localhost:5001/api/trains/" + trainId, {
+                method: "PUT",
+                headers: { "Accept": "application/json", "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    trainId: parseInt(trainId, 10),
+                    trainNumber: trainNumber,
+                    distanceInKm: distanceInKm,
+                    isBrandedTrain: isBrandedTrain,
+                    trainTypeId: trainTypeId
+                })
+            });
+            if (response.ok === true) {
+                const train = await response.json();
+                reset();
+                document.querySelector("tr[data-rowid='" + train.trainId + "']").replaceWith(row(train));
+            }
+        }
+
+        async function DeleteTrain(trainId) {
+            const response = await fetch("http://localhost:5001/api/trains/" + trainId, {
+                method: "DELETE",
+                headers: { "Accept": "application/json" }
+            });
+
+            if (response.ok === true) {
+                document.querySelector("tr[data-rowid='" + trainId + "']").remove();
+            }
+        }
+        // создание строки для таблицы
+        function row(train) {
+
+            const tr = document.createElement("tr");
+            tr.setAttribute("data-rowid", train.trainId);
+
+            const idTd = document.createElement("td");
+            idTd.append(train.trainId);
+            tr.append(idTd);
+
+            const numberTd = document.createElement("td");
+            numberTd.append(train.trainNumber);
+            tr.append(numberTd);
+
+            const distanceInKmTd = document.createElement("td");
+            distanceInKmTd.append(train.distanceInKm);
+            tr.append(distanceInKmTd);
+
+            const isBrandedTrainTd = document.createElement("td");
+            if (train.isBrandedTrain == true) {
+                isBrandedTrainTd.append("Да");
+            }
+            else {
+                isBrandedTrainTd.append("Нет");
+            }
+            tr.append(isBrandedTrainTd);
+
+            const trainType = allTrainTypes.find(type => type.trainTypeId === train.trainTypeId);
+            const trainTypeTd = document.createElement("td");
+            trainTypeTd.append(trainType.typeName);
+            tr.append(trainTypeTd);
+
+
+            const linksTd = document.createElement("td");
+
+            const editLink = document.createElement("a");
+            editLink.setAttribute("data-id", train.trainId);
+            editLink.setAttribute("class", "btn btn-info");
+            editLink.append("Изменить");
+            editLink.addEventListener("click", e => {
+
+                e.preventDefault();
+                GetTrain(train.trainId);
+            });
+            linksTd.append(editLink);
+            linksTd.append(" | ");
+            const removeLink = document.createElement("a");
+            removeLink.setAttribute("data-id", train.trainId);
+            removeLink.setAttribute("class", "btn btn-info");
+            removeLink.append("Удалить");
+            removeLink.addEventListener("click", e => {
+
+                e.preventDefault();
+                DeleteTrain(train.trainId);
+            });
+
+            linksTd.append(removeLink);
+            tr.appendChild(linksTd);
+
+            return tr;
+        }
+        // форма
+
+        // сброс формы
+        function reset() {
+            const form = document.forms["trainForm"];
+            form.reset();
+            form.elements["trainId"].value = 0;
+        }
+
+        // сброс значений формы
+        document.getElementById("reset").addEventListener("click", function (e) {
+            e.preventDefault();
+            reset();
+        });
+        // отправка формы
+        document.forms["trainForm"].addEventListener("submit", e => {
+            e.preventDefault();
+            const form = document.forms["trainForm"];
+            const trainId = form.elements["trainId"].value;
+            const trainNumber = form.elements["trainNumber"].value;
+            const distanceInKm = form.elements["distanceInKm"].value;
+            const isBrandedTrain = form.elements["isBrandedTrain"].checked;
+            const trainTypeId = form.elements["trainType"].value;
+
+            if (trainId == 0) {
+                // Создание нового поезда
+                CreateTrain(trainNumber, distanceInKm, isBrandedTrain, trainTypeId);
+            } else {
+                // Редактирование существующего поезда
+                EditTrain(trainId, trainNumber, distanceInKm, isBrandedTrain, trainTypeId);
+            }
+        });
+
+        // загрузка данных
+        fillTrainTypes();
+        GetTrains();
+
+    </script>
+</body>
+</html>
